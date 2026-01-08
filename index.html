@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>超慢跑節拍器 - 簡潔精確版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto+Sans+TC', sans-serif;
+            touch-action: manipulation;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .ocean-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+        }
+
+        .btn-active:active {
+            transform: scale(0.95);
+        }
+
+        /* 順時鐘圓形進度條 */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.5s linear;
+            transform: rotate(-90deg) scaleX(-1);
+            transform-origin: 50% 50%;
+        }
+
+        .progress-shadow {
+            filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.15));
+        }
+
+        .modal-enter {
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #0ea5e9;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="ocean-card rounded-[3.5rem] shadow-2xl p-7 w-full max-w-md relative border-4 border-white overflow-hidden text-slate-800">
+        
+        <!-- 背景裝飾波浪 -->
+        <div class="absolute bottom-0 left-0 w-full opacity-5 pointer-events-none">
+            <svg viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg"><path fill="#0284c7" d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,144C672,139,768,181,864,202.7C960,224,1056,224,1152,197.3C1248,171,1344,117,1392,90.7L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>
+        </div>
+
+        <!-- 數位鍵盤輸入面板 -->
+        <div id="inputModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
+            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl modal-enter text-center">
+                <div id="modalTitle" class="text-xl font-bold text-slate-700 mb-4 text-center">輸入數值</div>
+                <input type="number" id="modalInput" class="w-full text-center text-5xl font-black py-4 border-b-4 border-sky-100 mb-8 outline-none focus:border-sky-500 text-sky-900 bg-transparent" placeholder="0">
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="closeInputModal()" class="h-14 bg-slate-100 text-slate-500 rounded-2xl font-bold">取消</button>
+                    <button onclick="confirmInputModal()" class="h-14 bg-sky-500 text-white rounded-2xl font-bold shadow-lg shadow-sky-200">確定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 標題 -->
+        <div class="flex items-center justify-center mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i data-lucide="timer" class="w-6 h-6"></i>
+                </div>
+                <h1 class="text-2xl font-black text-sky-900 tracking-tight">超慢跑節拍器</h1>
+            </div>
+        </div>
+
+        <!-- 圓形計時器區域 -->
+        <div class="relative flex justify-center items-center mb-8">
+            <svg class="w-64 h-64 progress-shadow">
+                <circle class="text-slate-100" stroke-width="10" stroke="currentColor" fill="transparent" r="115" cx="128" cy="128" />
+                <circle id="progressCircle" class="progress-ring__circle text-sky-500" stroke-width="12" stroke-dasharray="722.5" stroke-dashoffset="0" stroke-linecap="round" stroke="currentColor" fill="transparent" r="115" cx="128" cy="128" />
+            </svg>
+
+            <div class="absolute text-center">
+                <div class="flex bg-slate-100 p-1 rounded-xl mb-3 mx-auto w-fit shadow-inner">
+                    <button id="modeCountdown" onclick="setTimerMode('countdown')" class="px-4 py-1 rounded-lg font-bold text-xs bg-white text-sky-800 shadow-sm transition-all">倒數模式</button>
+                    <button id="modeStopwatch" onclick="setTimerMode('stopwatch')" class="px-4 py-1 rounded-lg font-bold text-xs text-slate-400 transition-all">碼表模式</button>
+                </div>
+                <div id="timerDisplayContainer" class="cursor-pointer group flex flex-col items-center" onclick="openInputModal('timer')">
+                    <div id="timerDisplay" class="text-6xl font-black text-slate-800 tabular-nums leading-none mb-2">20:00</div>
+                    <div id="statusIndicator" class="px-3 py-1 rounded-full bg-sky-50 text-sky-600 font-bold text-[10px] uppercase tracking-widest">
+                        Ready
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BPM 控制區 -->
+        <div class="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-sky-50">
+            <div class="flex justify-between items-center mb-2 px-1 text-sky-800 font-bold">
+                <span class="text-sm">步頻速率 (BPM)</span>
+                <span class="text-[10px] text-sky-300">點擊數字修改</span>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+                <button onclick="changeBPM(-5)" class="w-12 h-12 bg-sky-50 rounded-2xl flex items-center justify-center text-xl font-black text-sky-600 btn-active border border-sky-100">－</button>
+                <div class="flex-1 text-center cursor-pointer" onclick="openInputModal('bpm')">
+                    <span id="bpmDisplay" class="text-6xl font-black text-slate-800 leading-none">180</span>
+                </div>
+                <button onclick="changeBPM(5)" class="w-12 h-12 bg-sky-50 rounded-2xl flex items-center justify-center text-xl font-black text-sky-600 btn-active border border-sky-100">＋</button>
+            </div>
+            <input type="range" id="bpmSlider" min="40" max="240" value="180" class="w-full mt-5 cursor-pointer accent-sky-500">
+        </div>
+
+        <!-- 快速功能按鈕 -->
+        <div class="grid grid-cols-4 gap-2 mb-6">
+            <button onclick="setTimer(10)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">10分</button>
+            <button onclick="setTimer(20)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">20分</button>
+            <button onclick="setTimer(30)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">30分</button>
+            <button onclick="setTimer(60)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">60分</button>
+        </div>
+
+        <div id="cheerBox" class="text-center text-slate-400 font-bold mb-6 h-6 italic text-sm">
+            準備好開始運動了嗎？
+        </div>
+
+        <!-- 主控制鈕 -->
+        <div class="grid grid-cols-2 gap-4">
+            <button id="startBtn" onclick="toggleMetronome()" class="col-span-2 h-20 bg-sky-600 hover:bg-sky-700 text-white rounded-3xl text-2xl font-black shadow-xl shadow-sky-200 btn-active flex items-center justify-center gap-3 transition-colors">
+                <i id="playIcon" data-lucide="play" class="w-8 h-8 fill-current"></i> <span id="startBtnText">開始跑步</span>
+            </button>
+            <button onclick="resetAll()" class="h-14 bg-white text-slate-600 rounded-2xl font-bold border border-slate-100 btn-active shadow-sm">
+                一鍵重置
+            </button>
+            <button id="stopBtn" onclick="stopMetronome()" class="h-14 bg-rose-50 text-rose-500 rounded-2xl font-bold border border-rose-100 btn-active shadow-sm">
+                暫停/停止
+            </button>
+        </div>
+
+        <!-- 設定區 -->
+        <details class="mt-6 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
+            <summary class="p-4 font-bold text-slate-500 cursor-pointer text-center text-xs select-none">設定與音色</summary>
+            <div class="p-5 space-y-6 bg-white border-t border-slate-100">
+                <div>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">節拍音色</label>
+                    <select id="soundType" class="w-full p-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                        <option value="classic" selected>經典節拍器</option>
+                        <option value="wood">木魚 (心靈放鬆)</option>
+                        <option value="whistle">體育哨子</option>
+                        <option value="bird">森林鳥鳴</option>
+                        <option value="water">清涼水滴</option>
+                        <option value="drum">震撼重低音</option>
+                        <option value="beep">電子音</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">背景音樂 (.mp3)</label>
+                    <input type="file" id="musicUpload" accept="audio/*" class="hidden" onchange="handleMusicUpload(this)">
+                    <div class="flex gap-2">
+                        <button onclick="document.getElementById('musicUpload').click()" class="flex-1 py-3 bg-sky-50 text-sky-700 rounded-xl font-bold text-xs border border-sky-100">選取音樂檔案</button>
+                        <button onclick="clearMusic()" class="px-4 bg-slate-50 text-slate-400 rounded-xl border border-slate-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    <div id="musicControls" class="hidden mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-2">
+                            <span id="musicFileName" class="truncate max-w-[150px]">音樂已載入</span>
+                            <span id="musicVolDisplay">50%</span>
+                        </div>
+                        <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.05" value="0.5" class="w-full h-1.5 accent-sky-400" oninput="updateMusicVolume(this.value)">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">節拍音量</label>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" class="w-full h-2 accent-sky-500">
+                </div>
+
+                <div>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">加油鼓勵頻率</label>
+                    <select id="cheerInterval" class="w-full p-3 rounded-xl border border-slate-200 font-bold bg-white outline-none">
+                        <option value="60">每 1 分鐘</option>
+                        <option value="120" selected>每 2 分鐘</option>
+                        <option value="300">每 5 分鐘</option>
+                        <option value="0">關閉</option>
+                    </select>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <audio id="bgMusicPlayer" loop></audio>
+
+    <script>
+        // --- Web Worker 背景調度 ---
+        const workerCode = `
+            let timer = null;
+            self.onmessage = function(e) {
+                if (e.data === 'start') {
+                    if (timer) clearInterval(timer);
+                    timer = setInterval(() => self.postMessage('tick'), 25);
+                } else if (e.data === 'stop') {
+                    if (timer) clearInterval(timer);
+                    timer = null;
+                }
+            };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const worker = new Worker(URL.createObjectURL(blob));
+
+        var audioCtx = null;
+        var isRunning = false;
+        var bpm = 180;
+        var nextNoteTime = 0.0;
+        var timerInterval = null;
+        var currentTimerValue = 1200; 
+        var targetTotalSeconds = 1200; 
+        var timerMode = 'countdown'; 
+        var scheduleAheadTime = 0.1;
+        const circleCircumference = 722.5;
+
+        const cheerMessages = ["穩定呼吸，做得好", "步頻規律，很棒", "持續前進，加油", "深呼吸，放鬆肩膀", "穩定維持，快完成囉"];
+
+        function refreshIcons() {
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        window.onload = function() {
+            refreshIcons();
+            updateTimerDisplay();
+            updateBPMUI();
+            worker.onmessage = (e) => { if (e.data === 'tick' && isRunning) scheduler(); };
+        };
+
+        function updateProgressCircle() {
+            const circle = document.getElementById('progressCircle');
+            if (!circle) return;
+            if (timerMode === 'countdown') {
+                const percent = currentTimerValue / (targetTotalSeconds || 1);
+                const offset = circleCircumference * (1 - percent);
+                circle.style.strokeDashoffset = offset;
+            } else {
+                const offset = circleCircumference * (1 - (currentTimerValue % 60) / 60);
+                circle.style.strokeDashoffset = offset;
+            }
+        }
+
+        function openInputModal(target) {
+            if (isRunning) return;
+            initAudio();
+            const modal = document.getElementById('inputModal');
+            const input = document.getElementById('modalInput');
+            if (!modal || !input) return;
+            modal.classList.remove('hidden');
+            window.modalTarget = target;
+            if (target === 'bpm') {
+                document.getElementById('modalTitle').innerText = "輸入步頻速率 (BPM)";
+                input.value = bpm;
+            } else {
+                document.getElementById('modalTitle').innerText = "輸入倒數分鐘數";
+                input.value = Math.floor(currentTimerValue / 60);
+            }
+            input.focus();
+            input.select();
+        }
+
+        function closeInputModal() { document.getElementById('inputModal').classList.add('hidden'); }
+
+        function confirmInputModal() {
+            const val = parseInt(document.getElementById('modalInput').value);
+            if (!isNaN(val)) {
+                if (window.modalTarget === 'bpm') {
+                    bpm = Math.min(240, Math.max(40, val));
+                    updateBPMUI();
+                } else {
+                    currentTimerValue = Math.max(0, val) * 60;
+                    targetTotalSeconds = currentTimerValue || 1; 
+                    updateTimerDisplay();
+                }
+            }
+            closeInputModal();
+        }
+
+        function playNote(time) {
+            if (!audioCtx) return;
+            const type = document.getElementById('soundType').value;
+            const volume = parseFloat(document.getElementById('volumeSlider').value);
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            gain.connect(audioCtx.destination);
+            osc.connect(gain);
+            gain.gain.setValueAtTime(volume, time);
+            switch(type) {
+                case 'classic': osc.type = 'sine'; osc.frequency.setValueAtTime(1200, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05); break;
+                case 'wood': osc.type = 'triangle'; osc.frequency.setValueAtTime(440, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); break;
+                case 'whistle': osc.type = 'sine'; osc.frequency.setValueAtTime(2500, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); break;
+                case 'bird': osc.type = 'sine'; osc.frequency.setValueAtTime(3000, time); osc.frequency.exponentialRampToValueAtTime(5000, time + 0.05); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); break;
+                case 'water': osc.type = 'sine'; osc.frequency.setValueAtTime(2000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03); break;
+                case 'drum': osc.type = 'sine'; osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(40, time + 0.1); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2); break;
+                case 'beep': osc.type = 'square'; osc.frequency.setValueAtTime(880, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1); break;
+                default: osc.type = 'sine'; osc.frequency.setValueAtTime(1000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+            }
+            osc.start(time); osc.stop(time + 0.3);
+            if ("vibrate" in navigator) navigator.vibrate(10);
+        }
+
+        function scheduler() {
+            while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+                playNote(nextNoteTime);
+                nextNoteTime += 60.0 / bpm;
+            }
+        }
+
+        function toggleMetronome() {
+            initAudio();
+            const musicPlayer = document.getElementById('bgMusicPlayer');
+            if (isRunning) {
+                pauseMetronome();
+            } else {
+                isRunning = true;
+                nextNoteTime = audioCtx.currentTime + 0.05;
+                worker.postMessage('start');
+                startTimer();
+                updateUIState(true);
+                if (musicPlayer.src) musicPlayer.play().catch(e => {});
+            }
+        }
+
+        function pauseMetronome() {
+            isRunning = false;
+            worker.postMessage('stop');
+            if (timerInterval) clearInterval(timerInterval);
+            updateUIState(false);
+            const musicPlayer = document.getElementById('bgMusicPlayer');
+            if (musicPlayer) musicPlayer.pause();
+        }
+
+        function stopMetronome() {
+            pauseMetronome();
+            if (timerMode === 'stopwatch') currentTimerValue = 0;
+            updateTimerDisplay();
+            document.getElementById('statusIndicator').innerText = "Paused";
+        }
+
+        function updateUIState(running) {
+            const btn = document.getElementById('startBtn');
+            const btnText = document.getElementById('startBtnText');
+            const status = document.getElementById('statusIndicator');
+            const icon = document.getElementById('playIcon');
+            if (!btn || !status || !btnText || !icon) return;
+            if (running) {
+                btn.classList.replace('bg-sky-600', 'bg-amber-500');
+                btnText.innerText = "暫停跑步";
+                status.innerText = "Running";
+                status.classList.replace('bg-sky-50', 'bg-emerald-500');
+                status.classList.add('text-white');
+                icon.setAttribute('data-lucide', 'pause');
+            } else {
+                btn.classList.replace('bg-amber-500', 'bg-sky-600');
+                btnText.innerText = "開始跑步";
+                status.innerText = "Paused";
+                status.classList.replace('bg-emerald-500', 'bg-sky-50');
+                status.classList.remove('text-white');
+                icon.setAttribute('data-lucide', 'play');
+            }
+            refreshIcons();
+        }
+
+        function changeBPM(delta) {
+            initAudio(); 
+            bpm = Math.min(240, Math.max(40, bpm + delta));
+            updateBPMUI();
+        }
+
+        function updateBPMUI() {
+            document.getElementById('bpmDisplay').innerText = bpm;
+            document.getElementById('bpmSlider').value = bpm;
+        }
+
+        document.getElementById('bpmSlider').oninput = function() {
+            bpm = parseInt(this.value);
+            document.getElementById('bpmDisplay').innerText = bpm;
+        };
+
+        function setTimerMode(mode) {
+            if (isRunning) return; 
+            timerMode = mode;
+            const btnCount = document.getElementById('modeCountdown');
+            const btnStop = document.getElementById('modeStopwatch');
+            if (mode === 'countdown') {
+                btnCount.className = "px-4 py-1.5 rounded-lg font-bold text-xs bg-sky-500 text-white shadow-sm transition-all";
+                btnStop.className = "px-4 py-1.5 rounded-lg font-bold text-xs text-slate-400 transition-all";
+                currentTimerValue = 1200; targetTotalSeconds = 1200;
+            } else {
+                btnStop.className = "px-4 py-1.5 rounded-lg font-bold text-xs bg-sky-500 text-white shadow-sm transition-all";
+                btnCount.className = "px-4 py-1.5 rounded-lg font-bold text-xs text-slate-400 transition-all";
+                currentTimerValue = 0;
+            }
+            updateTimerDisplay();
+        }
+
+        function setTimer(mins) {
+            initAudio();
+            if (timerMode === 'countdown') {
+                currentTimerValue = mins * 60;
+                targetTotalSeconds = currentTimerValue;
+                updateTimerDisplay();
+            }
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(currentTimerValue / 60);
+            const s = currentTimerValue % 60;
+            document.getElementById('timerDisplay').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            updateProgressCircle();
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const intervalSelect = document.getElementById('cheerInterval');
+                const interval = parseInt(intervalSelect ? intervalSelect.value : 120);
+                if (timerMode === 'countdown') {
+                    if (currentTimerValue > 0) {
+                        currentTimerValue--;
+                        updateTimerDisplay();
+                        if (interval > 0 && currentTimerValue > 0 && currentTimerValue % interval === 0) triggerCheer();
+                    } else {
+                        stopMetronome();
+                        finishEffect();
+                    }
+                } else {
+                    currentTimerValue++;
+                    updateTimerDisplay();
+                    if (interval > 0 && currentTimerValue > 0 && currentTimerValue % interval === 0) triggerCheer();
+                }
+            }, 1000);
+        }
+
+        function triggerCheer() {
+            const msg = cheerMessages[Math.floor(Math.random()*cheerMessages.length)];
+            document.getElementById('cheerBox').innerText = msg;
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(msg);
+                utterance.volume = 1; window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function finishEffect() {
+            document.getElementById('cheerBox').innerText = "目標達成！";
+            if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance("恭喜完成運動目標，休息一下吧。"));
+        }
+
+        function resetAll() { location.reload(); }
+
+        function handleMusicUpload(input) {
+            const file = input.files[0];
+            if (file) {
+                const player = document.getElementById('bgMusicPlayer');
+                player.src = URL.createObjectURL(file);
+                document.getElementById('musicFileName').innerText = file.name;
+                document.getElementById('musicControls').classList.remove('hidden');
+                if (isRunning) player.play().catch(e => {});
+            }
+        }
+        function clearMusic() {
+            const player = document.getElementById('bgMusicPlayer');
+            player.pause(); player.src = "";
+            document.getElementById('musicControls').classList.add('hidden');
+            document.getElementById('musicUpload').value = "";
+        }
+        function updateMusicVolume(val) {
+            document.getElementById('bgMusicPlayer').volume = val;
+        }
+    </script>
+</body>
+</html>
