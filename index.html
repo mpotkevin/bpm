@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>超慢跑節拍器 - 簡潔精確版</title>
+    <title>超慢跑節拍器 - 通用設計版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         
+        :root {
+            --swing-duration: 0.333s; 
+        }
+
         body {
             font-family: 'Noto+Sans+TC', sans-serif;
             touch-action: manipulation;
@@ -38,6 +42,22 @@
 
         .progress-shadow {
             filter: drop-shadow(0 0 6px rgba(14, 165, 233, 0.15));
+        }
+
+        /* 擬真節拍器擺動動畫 - 恢復為 ±45度 */
+        .metronome-arm {
+            transform-origin: bottom center;
+            transform: rotate(-45deg); 
+        }
+
+        .swing-animation {
+            /* 使用 linear 確保等速運動，alternate 確保左右對稱往返 */
+            animation: pendulum var(--swing-duration) infinite linear alternate;
+        }
+
+        @keyframes pendulum {
+            from { transform: rotate(-45deg); } /* 對應量角器 135度 */
+            to { transform: rotate(45deg); }    /* 對應量角器 45度 */
         }
 
         .modal-enter {
@@ -70,9 +90,9 @@
             <svg viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg"><path fill="#0284c7" d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,144C672,139,768,181,864,202.7C960,224,1056,224,1152,197.3C1248,171,1344,117,1392,90.7L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>
         </div>
 
-        <!-- 數位鍵盤輸入面板 -->
+        <!-- 數位大鍵盤彈窗 -->
         <div id="inputModal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
-            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl modal-enter text-center">
+            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl modal-enter text-center border-4 border-sky-50">
                 <div id="modalTitle" class="text-xl font-bold text-slate-700 mb-4 text-center">輸入數值</div>
                 <input type="number" id="modalInput" class="w-full text-center text-5xl font-black py-4 border-b-4 border-sky-100 mb-8 outline-none focus:border-sky-500 text-sky-900 bg-transparent" placeholder="0">
                 <div class="grid grid-cols-2 gap-4">
@@ -92,8 +112,8 @@
             </div>
         </div>
 
-        <!-- 圓形計時器區域 -->
-        <div class="relative flex justify-center items-center mb-8">
+        <!-- 圓環計時器區域 -->
+        <div class="relative flex justify-center items-center mb-4">
             <svg class="w-64 h-64 progress-shadow">
                 <circle class="text-slate-100" stroke-width="10" stroke="currentColor" fill="transparent" r="115" cx="128" cy="128" />
                 <circle id="progressCircle" class="progress-ring__circle text-sky-500" stroke-width="12" stroke-dasharray="722.5" stroke-dashoffset="0" stroke-linecap="round" stroke="currentColor" fill="transparent" r="115" cx="128" cy="128" />
@@ -113,11 +133,39 @@
             </div>
         </div>
 
+        <!-- 視覺節拍器 (量角器精準同步版) -->
+        <div id="metronomeVisual" class="hidden flex-col items-center mb-6 transition-all duration-300">
+            <div class="relative w-64 h-36 flex justify-center items-end pb-6 bg-sky-50/20 rounded-t-full border-b border-sky-100/50 overflow-hidden">
+                <svg class="absolute top-2 w-full h-full" style="overflow: visible;" viewBox="0 0 100 50">
+                    <!-- 180度主圓弧 -->
+                    <path d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="#e2e8f0" stroke-width="1.5" />
+                    
+                    <!-- JS 生成刻度 -->
+                    <g id="protractorTicks"></g>
+
+                    <!-- 45度與135度 端點強化藍色線條 -->
+                    <line x1="21.5" y1="16.5" x2="28" y2="23" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" /> <!-- 135° -->
+                    <line x1="78.5" y1="16.5" x2="72" y2="23" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" /> <!-- 45° -->
+                    
+                    <!-- 中心點參考線 (90度) -->
+                    <line x1="50" y1="5" x2="50" y2="15" stroke="#cbd5e1" stroke-width="1.5" />
+                </svg>
+
+                <!-- 擺動指針 -->
+                <div id="pendulum" class="metronome-arm absolute bottom-6 w-1.5 h-24 bg-slate-400 rounded-full shadow-sm">
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-5 bg-sky-500 rounded-full border-2 border-white shadow-md"></div>
+                </div>
+                <!-- 底座旋轉中心 -->
+                <div class="absolute bottom-[-4px] w-8 h-8 bg-slate-300 rounded-full border-4 border-white shadow-inner z-30"></div>
+            </div>
+            <div class="text-[10px] font-black text-sky-400/50 uppercase tracking-[0.3em] mt-2">Precision Sync (45° - 135°)</div>
+        </div>
+
         <!-- BPM 控制區 -->
         <div class="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-sky-50">
             <div class="flex justify-between items-center mb-2 px-1 text-sky-800 font-bold">
                 <span class="text-sm">步頻速率 (BPM)</span>
-                <span class="text-[10px] text-sky-300">點擊數字修改</span>
+                <span class="text-[10px] text-sky-300 italic">精準等速模式</span>
             </div>
             <div class="flex items-center justify-between gap-4">
                 <button onclick="changeBPM(-5)" class="w-12 h-12 bg-sky-50 rounded-2xl flex items-center justify-center text-xl font-black text-sky-600 btn-active border border-sky-100">－</button>
@@ -129,19 +177,15 @@
             <input type="range" id="bpmSlider" min="40" max="240" value="180" class="w-full mt-5 cursor-pointer accent-sky-500">
         </div>
 
-        <!-- 快速功能按鈕 -->
+        <!-- 快速功能鍵 -->
         <div class="grid grid-cols-4 gap-2 mb-6">
-            <button onclick="setTimer(10)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">10分</button>
-            <button onclick="setTimer(20)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">20分</button>
-            <button onclick="setTimer(30)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">30分</button>
-            <button onclick="setTimer(60)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm transition-all hover:bg-sky-50">60分</button>
+            <button onclick="setTimer(10)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm hover:bg-sky-50">10分</button>
+            <button onclick="setTimer(20)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm hover:bg-sky-50">20分</button>
+            <button onclick="setTimer(30)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm hover:bg-sky-50">30分</button>
+            <button onclick="setTimer(60)" class="py-2.5 bg-white rounded-xl font-bold text-slate-600 text-xs border border-slate-100 btn-active shadow-sm hover:bg-sky-50">60分</button>
         </div>
 
-        <div id="cheerBox" class="text-center text-slate-400 font-bold mb-6 h-6 italic text-sm">
-            準備好開始運動了嗎？
-        </div>
-
-        <!-- 主控制鈕 -->
+        <!-- 控制主按鈕 -->
         <div class="grid grid-cols-2 gap-4">
             <button id="startBtn" onclick="toggleMetronome()" class="col-span-2 h-20 bg-sky-600 hover:bg-sky-700 text-white rounded-3xl text-2xl font-black shadow-xl shadow-sky-200 btn-active flex items-center justify-center gap-3 transition-colors">
                 <i id="playIcon" data-lucide="play" class="w-8 h-8 fill-current"></i> <span id="startBtnText">開始跑步</span>
@@ -154,46 +198,37 @@
             </button>
         </div>
 
-        <!-- 設定區 -->
+        <!-- 設定選單 -->
         <details class="mt-6 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
             <summary class="p-4 font-bold text-slate-500 cursor-pointer text-center text-xs select-none">設定與音色</summary>
             <div class="p-5 space-y-6 bg-white border-t border-slate-100">
-                <div>
-                    <label class="block font-bold mb-2 text-slate-700 text-sm">節拍音色</label>
-                    <select id="soundType" class="w-full p-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                        <option value="classic" selected>經典節拍器</option>
-                        <option value="wood">木魚 (心靈放鬆)</option>
-                        <option value="whistle">體育哨子</option>
-                        <option value="bird">森林鳥鳴</option>
-                        <option value="water">清涼水滴</option>
-                        <option value="drum">震撼重低音</option>
-                        <option value="beep">電子音</option>
-                    </select>
+                <!-- 通用設計視覺開關 -->
+                <div class="flex items-center justify-between p-3 bg-sky-50 rounded-xl border border-sky-100 shadow-inner">
+                    <label class="font-bold text-sky-900 text-sm">視覺輔助(通用設計)</label>
+                    <input type="checkbox" id="showMetronomeToggle" class="w-6 h-6 accent-sky-500" onchange="toggleMetronomeVisual(this.checked)">
                 </div>
 
-                <div>
-                    <label class="block font-bold mb-2 text-slate-700 text-sm">背景音樂 (.mp3)</label>
-                    <input type="file" id="musicUpload" accept="audio/*" class="hidden" onchange="handleMusicUpload(this)">
-                    <div class="flex gap-2">
-                        <button onclick="document.getElementById('musicUpload').click()" class="flex-1 py-3 bg-sky-50 text-sky-700 rounded-xl font-bold text-xs border border-sky-100">選取音樂檔案</button>
-                        <button onclick="clearMusic()" class="px-4 bg-slate-50 text-slate-400 rounded-xl border border-slate-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                    <div id="musicControls" class="hidden mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-2">
-                            <span id="musicFileName" class="truncate max-w-[150px]">音樂已載入</span>
-                            <span id="musicVolDisplay">50%</span>
-                        </div>
-                        <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.05" value="0.5" class="w-full h-1.5 accent-sky-400" oninput="updateMusicVolume(this.value)">
-                    </div>
-                </div>
-
+                <!-- 節拍音量 (移至音色上方) -->
                 <div>
                     <label class="block font-bold mb-2 text-slate-700 text-sm">節拍音量</label>
                     <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" class="w-full h-2 accent-sky-500">
                 </div>
 
+                <!-- 節拍音色 -->
                 <div>
-                    <label class="block font-bold mb-2 text-slate-700 text-sm">加油鼓勵頻率</label>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">節拍音色</label>
+                    <select id="soundType" class="w-full p-3 rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                        <option value="classic" selected>經典節拍器</option>
+                        <option value="drum">真實大鼓聲 (打擊感)</option>
+                        <option value="whistle">體育哨子</option>
+                        <option value="bird">森林鳥鳴</option>
+                        <option value="water">清涼水滴</option>
+                        <option value="beep">電子音</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-bold mb-2 text-slate-700 text-sm">加油頻率</label>
                     <select id="cheerInterval" class="w-full p-3 rounded-xl border border-slate-200 font-bold bg-white outline-none">
                         <option value="60">每 1 分鐘</option>
                         <option value="120" selected>每 2 分鐘</option>
@@ -201,14 +236,31 @@
                         <option value="0">關閉</option>
                     </select>
                 </div>
+
+                <!-- 背景音樂播放器置底 -->
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block font-bold mb-2 text-slate-500 text-xs">背景音樂播放器 (.mp3)</label>
+                    <input type="file" id="musicUpload" accept="audio/*" class="hidden" onchange="handleMusicUpload(this)">
+                    <button onclick="document.getElementById('musicUpload').click()" class="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs border border-slate-200">選取音樂檔案</button>
+                    <div id="musicControls" class="hidden mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                        <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-2 truncate" id="musicFileName">音樂已載入</div>
+                        <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.05" value="0.5" class="w-full h-1.5 accent-sky-400" oninput="updateMusicVolume(this.value)">
+                        <button onclick="clearMusic()" class="mt-2 text-rose-400 text-[10px] font-bold w-full text-right">移除音樂</button>
+                    </div>
+                </div>
             </div>
         </details>
+
+        <!-- 設計者資訊與超連結 -->
+        <div class="mt-8 text-center text-[10px] text-slate-400 font-bold border-t border-slate-100 pt-5 pb-5">
+            設計：<a href="https://www.facebook.com/kevin.pptgame" target="_blank" class="hover:text-sky-500 transition-colors underline decoration-sky-200 underline-offset-4">職能治療師 - 鄭凱文</a>
+        </div>
+        
     </div>
 
     <audio id="bgMusicPlayer" loop></audio>
 
     <script>
-        // --- Web Worker 背景調度 ---
         const workerCode = `
             let timer = null;
             self.onmessage = function(e) {
@@ -248,12 +300,58 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
         }
 
+        function createProtractorTicks() {
+            const group = document.getElementById('protractorTicks');
+            if (!group) return;
+            group.innerHTML = '';
+            const radius = 40; 
+            const centerX = 50;
+            const centerY = 45;
+            for (let angle = 0; angle <= 180; angle += 5) {
+                const rad = (180 - angle) * (Math.PI / 180);
+                const x1 = centerX + radius * Math.cos(rad);
+                const y1 = centerY - radius * Math.sin(rad);
+                const isMajor = (angle % 45 === 0);
+                const length = isMajor ? 6 : 3;
+                const x2 = centerX + (radius - length) * Math.cos(rad);
+                const y2 = centerY - (radius - length) * Math.sin(rad);
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+                line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+                line.setAttribute("stroke", isMajor ? "#94a3b8" : "#e2e8f0");
+                line.setAttribute("stroke-width", "1.5");
+                group.appendChild(line);
+            }
+        }
+
         window.onload = function() {
             refreshIcons();
+            createProtractorTicks();
             updateTimerDisplay();
             updateBPMUI();
             worker.onmessage = (e) => { if (e.data === 'tick' && isRunning) scheduler(); };
         };
+
+        function toggleMetronomeVisual(show) {
+            const visual = document.getElementById('metronomeVisual');
+            if (show) {
+                visual.classList.remove('hidden');
+                visual.classList.add('flex');
+            } else {
+                visual.classList.add('hidden');
+                visual.classList.remove('flex');
+            }
+        }
+
+        function updatePendulumSpeed() {
+            const pendulum = document.getElementById('pendulum');
+            if (!pendulum) return;
+            const duration = (60 / bpm).toFixed(3);
+            document.documentElement.style.setProperty('--swing-duration', `${duration}s`);
+            if (isRunning) pendulum.classList.add('swing-animation');
+            else pendulum.classList.remove('swing-animation');
+        }
 
         function updateProgressCircle() {
             const circle = document.getElementById('progressCircle');
@@ -280,7 +378,7 @@
                 document.getElementById('modalTitle').innerText = "輸入步頻速率 (BPM)";
                 input.value = bpm;
             } else {
-                document.getElementById('modalTitle').innerText = "輸入倒數分鐘數";
+                document.getElementById('modalTitle').innerText = "輸入運動分鐘數";
                 input.value = Math.floor(currentTimerValue / 60);
             }
             input.focus();
@@ -295,6 +393,7 @@
                 if (window.modalTarget === 'bpm') {
                     bpm = Math.min(240, Math.max(40, val));
                     updateBPMUI();
+                    updatePendulumSpeed();
                 } else {
                     currentTimerValue = Math.max(0, val) * 60;
                     targetTotalSeconds = currentTimerValue || 1; 
@@ -308,22 +407,45 @@
             if (!audioCtx) return;
             const type = document.getElementById('soundType').value;
             const volume = parseFloat(document.getElementById('volumeSlider').value);
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            gain.connect(audioCtx.destination);
-            osc.connect(gain);
-            gain.gain.setValueAtTime(volume, time);
-            switch(type) {
-                case 'classic': osc.type = 'sine'; osc.frequency.setValueAtTime(1200, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05); break;
-                case 'wood': osc.type = 'triangle'; osc.frequency.setValueAtTime(440, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); break;
-                case 'whistle': osc.type = 'sine'; osc.frequency.setValueAtTime(2500, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); break;
-                case 'bird': osc.type = 'sine'; osc.frequency.setValueAtTime(3000, time); osc.frequency.exponentialRampToValueAtTime(5000, time + 0.05); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); break;
-                case 'water': osc.type = 'sine'; osc.frequency.setValueAtTime(2000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03); break;
-                case 'drum': osc.type = 'sine'; osc.frequency.setValueAtTime(150, time); osc.frequency.exponentialRampToValueAtTime(40, time + 0.1); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2); break;
-                case 'beep': osc.type = 'square'; osc.frequency.setValueAtTime(880, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1); break;
-                default: osc.type = 'sine'; osc.frequency.setValueAtTime(1000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+            
+            if (type === 'drum') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
+                gain.gain.setValueAtTime(volume, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(time);
+                osc.stop(time + 0.2);
+                const noise = audioCtx.createOscillator();
+                const nGain = audioCtx.createGain();
+                noise.type = 'square';
+                noise.frequency.setValueAtTime(400, time);
+                nGain.gain.setValueAtTime(volume * 0.2, time);
+                nGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+                noise.connect(nGain);
+                nGain.connect(audioCtx.destination);
+                noise.start(time);
+                noise.stop(time + 0.02);
+            } else {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                gain.connect(audioCtx.destination);
+                osc.connect(gain);
+                gain.gain.setValueAtTime(volume, time);
+                switch(type) {
+                    case 'classic': osc.type = 'sine'; osc.frequency.setValueAtTime(1200, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05); break;
+                    case 'whistle': osc.type = 'sine'; osc.frequency.setValueAtTime(2500, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); break;
+                    case 'bird': osc.type = 'sine'; osc.frequency.setValueAtTime(3000, time); osc.frequency.exponentialRampToValueAtTime(5000, time + 0.05); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08); break;
+                    case 'water': osc.type = 'sine'; osc.frequency.setValueAtTime(2000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03); break;
+                    case 'beep': osc.type = 'square'; osc.frequency.setValueAtTime(880, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1); break;
+                    default: osc.type = 'sine'; osc.frequency.setValueAtTime(1000, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                }
+                osc.start(time); osc.stop(time + 0.3);
             }
-            osc.start(time); osc.stop(time + 0.3);
             if ("vibrate" in navigator) navigator.vibrate(10);
         }
 
@@ -345,6 +467,7 @@
                 worker.postMessage('start');
                 startTimer();
                 updateUIState(true);
+                updatePendulumSpeed();
                 if (musicPlayer.src) musicPlayer.play().catch(e => {});
             }
         }
@@ -354,6 +477,7 @@
             worker.postMessage('stop');
             if (timerInterval) clearInterval(timerInterval);
             updateUIState(false);
+            updatePendulumSpeed();
             const musicPlayer = document.getElementById('bgMusicPlayer');
             if (musicPlayer) musicPlayer.pause();
         }
@@ -393,6 +517,7 @@
             initAudio(); 
             bpm = Math.min(240, Math.max(40, bpm + delta));
             updateBPMUI();
+            updatePendulumSpeed();
         }
 
         function updateBPMUI() {
@@ -403,6 +528,7 @@
         document.getElementById('bpmSlider').oninput = function() {
             bpm = parseInt(this.value);
             document.getElementById('bpmDisplay').innerText = bpm;
+            updatePendulumSpeed();
         };
 
         function setTimerMode(mode) {
@@ -462,7 +588,6 @@
 
         function triggerCheer() {
             const msg = cheerMessages[Math.floor(Math.random()*cheerMessages.length)];
-            document.getElementById('cheerBox').innerText = msg;
             if ('speechSynthesis' in window) {
                 const utterance = new SpeechSynthesisUtterance(msg);
                 utterance.volume = 1; window.speechSynthesis.speak(utterance);
@@ -470,7 +595,6 @@
         }
 
         function finishEffect() {
-            document.getElementById('cheerBox').innerText = "目標達成！";
             if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance("恭喜完成運動目標，休息一下吧。"));
         }
 
